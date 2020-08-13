@@ -1,11 +1,13 @@
 {
     "name": "server",
     "version": "1.0.0",
+    "homepage": "http://danilokujacic.github.io/kviz-znanja-server",
     "description": "",
     "main": "index.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "start": "nodemon ./dist/server.js --watch"
+        "start": "nodemon ./dist/server.js --watch",
+        "deploy": "gh-pages -d /dist"
     },
     "keywords": [],
     "author": "",
@@ -22,6 +24,7 @@
         "cors": "^2.8.5",
         "dotenv": "^8.2.0",
         "express": "^4.17.1",
+        "gh-pages": "^3.1.0",
         "jsonwebtoken": "^8.5.1",
         "mongoose": "^5.9.28",
         "node-localstorage": "^2.1.6",
