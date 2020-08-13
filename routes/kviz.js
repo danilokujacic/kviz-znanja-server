@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var express_1 = require("express");
+var httpHandlers_1 = require("../httpHandlers");
+var router = express_1.Router();
+router.get('/history', httpHandlers_1.historyHandler);
+router.get('/geographic', httpHandlers_1.geographicHandler);
+router.get('/social', httpHandlers_1.socialHandler);
+router.get('/music', httpHandlers_1.musicHandler);
+exports.default = router;
