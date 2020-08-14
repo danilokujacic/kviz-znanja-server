@@ -7,7 +7,9 @@ import bodyParser from 'body-parser';
 import { LocalStorage } from 'node-localstorage';
 import 'dotenv/config';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 import { RSA_NO_PADDING } from 'constants';
+import { setupMaster } from 'cluster';
 
 const app = express();
 
@@ -37,33 +39,63 @@ app.post('/register', (req: express.Request, res: express.Response) => {
             if (usr) {
                 return res.status(400).json({ error: 'Name taken' });
             } else {
-                const user = new User({
-                    name: req.body.username,
-                    password: req.body.password,
-                    points: 0,
-                });
-
-                user.save();
-                jwt.sign(
-                    {
+                const setUser = async () => {
+                    const hashedPassword = await bcrypt.hash(
+                        req.body.password,
+                        6,
+                    );
+                    console.log(hashedPassword);
+                    const user = new User({
                         name: req.body.username,
-                        points: req.body.password,
-                    },
-                    'secrectkey',
-                    (err: any, token: any) => {
-                        res.status(200).json({
+                        password: hashedPassword,
+                        points: 0,
+                    });
+
+                    user.save();
+
+                    jwt.sign(
+                        {
                             name: req.body.username,
-                            points: req.body.password,
-                            status: 'Logged in',
-                            token,
-                        });
-                    },
-                );
+                            points: req.body.points,
+                        },
+                        'secrectkey',
+                        (err: any, token: any) => {
+                            res.status(200).json({
+                                name: req.body.username,
+                                points: req.body.points,
+                                status: 'Logged in',
+                                token,
+                            });
+                        },
+                    );
+                };
+                setUser();
             }
         },
     );
 });
 
+app.get('/getList', async (req: express.Request, res: express.Response) => {
+    User.find((err, data) => {
+        if (!err) {
+            res.status(200).json({
+                data,
+            });
+        }
+    });
+});
+app.get('/getUser', async (req: express.Request, res: express.Response) => {
+    const { name } = req.query;
+
+    User.findOne(
+        {
+            name,
+        },
+        (err: Object, user: any) => {
+            return res.json({ name: user.name, points: user.points });
+        },
+    );
+});
 app.get('/getPoints', async (req: express.Request, res: express.Response) => {
     const { name } = req.query;
 
@@ -81,7 +113,7 @@ app.put('/update', async (req: express.Request, res: express.Response) => {
     const bearerHeader = req.headers['authorization'];
     if (typeof bearerHeader !== 'undefined') {
         const bearer = bearerHeader.split(' ')[1];
-        jwt.verify(bearer, process.env.KEY_SECRET as string, (err, data) => {
+        jwt.verify(bearer, 'secrectkey', (err, data) => {
             if (err) {
                 res.status(403);
             } else {
@@ -91,6 +123,7 @@ app.put('/update', async (req: express.Request, res: express.Response) => {
                             name: (data as { name: string }).name,
                         },
                         (err: object, user: any) => {
+                            console.log(points);
                             user.points += points;
 
                             user.save();
@@ -124,13 +157,14 @@ app.post('/login', async (req: express.Request, res: express.Response) => {
             },
         ) => {
             if (!user) return res.status(404).json({ error: 'Not found' });
-            if (user.password === password) {
+            const comparison = bcrypt.compare(user.password, password);
+            if (comparison) {
                 jwt.sign(
                     {
                         name: user.name,
                         points: user.points,
                     },
-                    process.env.KEY_SECRET as string,
+                    'secrectkey',
                     (err: any, token: any) => {
                         res.status(200).json({
                             name: user.name,
@@ -151,11 +185,26 @@ app.post('/verify', (req, res) => {
     if (typeof bearerHeader !== 'undefined') {
         const bearer = bearerHeader.split(' ')[1];
 
-        jwt.verify(bearer, process.env.KEY_SECRET as string, (err, data) => {
+        jwt.verify(bearer, 'secrectkey', (err, data) => {
             if (err) {
                 res.status(403);
             } else {
-                res.status(200).json({ status: 'Approved', ...data });
+                User.findOne(
+                    {
+                        name: (data as { name: string }).name,
+                    },
+                    (err, usr: { points: number }) => {
+                        if (err) {
+                            res.status(403);
+                        } else {
+                            res.status(200).json({
+                                status: 'Approved',
+                                ...data,
+                                points: usr!.points,
+                            });
+                        }
+                    },
+                );
             }
         });
     } else {
